@@ -1,0 +1,623 @@
+/* ============================================================
+   BioChew Auth — auth.js
+   Handles: view switching, form validation, password strength,
+            show/hide password, forgot-password method tabs,
+            toast notifications, particle canvas, Google OAuth stub.
+   ============================================================ */
+
+'use strict';
+
+/* ── DOM REFS ──────────────────────────────────────────────── */
+const views = {
+    login    : document.getElementById('view-login'),
+    register : document.getElementById('view-register'),
+    forgot   : document.getElementById('view-forgot'),
+    success  : document.getElementById('view-success'),
+    reset    : document.getElementById('view-reset-password'),
+};
+
+/* ── VIEW SWITCHER ─────────────────────────────────────────── */
+function showView(name) {
+    Object.values(views).forEach(v => v.classList.remove('active'));
+    const target = views[name];
+    if (target) {
+        target.classList.add('active');
+        if (window.lucide) lucide.createIcons();
+    }
+}
+
+/* ── TOAST SYSTEM ──────────────────────────────────────────── */
+(function buildToastContainer() {
+    const el = document.createElement('div');
+    el.id = 'toast-container';
+    document.body.appendChild(el);
+})();
+
+function toast(message, type = 'info', durationMs = 3500) {
+    const container = document.getElementById('toast-container');
+    const iconMap = { success: 'check-circle', error: 'alert-circle', info: 'info' };
+    const div = document.createElement('div');
+    div.className = `toast ${type}`;
+    div.innerHTML = `
+        <svg class="toast-icon" data-lucide="${iconMap[type]}"></svg>
+        <span>${message}</span>`;
+    container.appendChild(div);
+    lucide.createIcons({ nodes: [div] });
+    setTimeout(() => {
+        div.classList.add('leaving');
+        div.addEventListener('animationend', () => div.remove());
+    }, durationMs);
+}
+
+/* ── PASSWORD VISIBILITY TOGGLE ────────────────────────────── */
+document.querySelectorAll('.toggle-pass').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const targetId = btn.dataset.target;
+        const input    = document.getElementById(targetId);
+        const icon     = btn.querySelector('.eye-icon');
+        if (!input) return;
+        const isPass = input.type === 'password';
+        input.type = isPass ? 'text' : 'password';
+        icon.setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
+        lucide.createIcons({ nodes: [icon] });
+    });
+});
+
+/* ── HELPERS ───────────────────────────────────────────────── */
+function setError(inputEl, errEl, message) {
+    if (inputEl) { inputEl.classList.add('is-error'); inputEl.classList.remove('is-valid'); }
+    if (errEl) errEl.textContent = message;
+    return false;
+}
+
+function clearError(inputEl, errEl) {
+    if (inputEl) { inputEl.classList.remove('is-error'); inputEl.classList.add('is-valid'); }
+    if (errEl) errEl.textContent = '';
+    return true;
+}
+
+function isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }
+function isValidPhone(phone)  { return /^\+?[\d\s\-().]{7,15}$/.test(phone); }
+
+/* ── PASSWORD STRENGTH METER ────────────────────────────────── */
+function calcStrength(password) {
+    let score = 0;
+    if (password.length >= 8)  score++;
+    if (password.length >= 12) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    return score;
+}
+
+const strengthColors = ['', '#ff3366', '#ffaa00', '#ffdd00', '#39ff14', '#00f0ff'];
+const strengthLabels = ['', 'Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
+
+document.getElementById('reg-password').addEventListener('input', function () {
+    const score = calcStrength(this.value);
+    const bar   = document.getElementById('reg-strength-bar');
+    const label = document.getElementById('reg-strength-label');
+    const pct   = this.value.length === 0 ? 0 : (score / 5) * 100;
+    bar.style.width      = pct + '%';
+    bar.style.background = strengthColors[score] || '#555';
+    label.textContent    = this.value.length === 0 ? '' : strengthLabels[score];
+    label.style.color    = strengthColors[score] || 'var(--text-muted)';
+});
+
+/* ── BUTTON LOADING STATE ───────────────────────────────────── */
+function setLoading(btn, state) {
+    if (state) btn.classList.add('loading');
+    else        btn.classList.remove('loading');
+    btn.disabled = state;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   LOGIN FORM
+───────────────────────────────────────────────────────────── */
+document.getElementById('form-login').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    let valid = true;
+
+    const emailEl    = document.getElementById('login-email');
+    const passwordEl = document.getElementById('login-password');
+    const emailErr   = document.getElementById('login-email-err');
+    const passErr    = document.getElementById('login-pass-err');
+
+    const identifier = emailEl.value.trim();
+    const password = passwordEl.value;
+
+    if (!identifier) {
+        valid = setError(emailEl, emailErr, 'Email or Phone Number is required.');
+    } else {
+        clearError(emailEl, emailErr);
+    }
+
+    if (!password) {
+        valid = setError(passwordEl, passErr, 'Password is required.');
+    } else {
+        clearError(passwordEl, passErr);
+    }
+
+    if (!valid) return;
+
+    const usersDb = JSON.parse(localStorage.getItem('biochew_users_db') || '[]');
+    const matchingUser = usersDb.find(u => 
+        (u.email && u.email.toLowerCase() === identifier.toLowerCase()) || 
+        (u.phone && u.phone.trim() === identifier.trim())
+    );
+
+    if (!matchingUser) {
+        setError(emailEl, emailErr, 'Account not found. Please check or register.');
+        return;
+    }
+
+    if (matchingUser.password !== password) {
+        setError(passwordEl, passErr, 'Incorrect password.');
+        return;
+    }
+
+    const btn = this.querySelector('[type="submit"]');
+    setLoading(btn, true);
+    await fakeRequest(1200);
+    setLoading(btn, false);
+
+    // Login successful!
+    // Set currently active user session
+    localStorage.setItem('biochew_user', JSON.stringify(matchingUser));
+    
+    // Load their specific history and notes
+    localStorage.setItem('biochew_session_history', JSON.stringify(matchingUser.history || []));
+    localStorage.setItem('biochew_session_notes', JSON.stringify(matchingUser.notes || []));
+
+    toast('Signed in successfully! Redirecting…', 'success');
+    setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+});
+
+/* ─────────────────────────────────────────────────────────────
+   REGISTER FORM — email/password only → goes to profile setup
+───────────────────────────────────────────────────────────── */
+document.getElementById('form-register').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    let valid = true;
+
+    const nameEl  = document.getElementById('reg-name');
+    const emailEl = document.getElementById('reg-email');
+    const phoneEl = document.getElementById('reg-phone');
+    const passEl  = document.getElementById('reg-password');
+    const confEl  = document.getElementById('reg-confirm');
+
+    const nameErr  = document.getElementById('reg-name-err');
+    const emailErr = document.getElementById('reg-email-err');
+    const phoneErr = document.getElementById('reg-phone-err');
+    const passErr  = document.getElementById('reg-pass-err');
+    const confErr  = document.getElementById('reg-confirm-err');
+
+    if (!nameEl.value.trim()) { valid = setError(nameEl, nameErr, 'Full name is required.'); }
+    else { clearError(nameEl, nameErr); }
+
+    if (!emailEl.value.trim()) { valid = setError(emailEl, emailErr, 'Email is required.'); }
+    else if (!isValidEmail(emailEl.value.trim())) { valid = setError(emailEl, emailErr, 'Enter a valid email address.'); }
+    else { clearError(emailEl, emailErr); }
+
+    if (!phoneEl.value.trim()) { valid = setError(phoneEl, phoneErr, 'Phone number is required.'); }
+    else if (!isValidPhone(phoneEl.value.trim())) { valid = setError(phoneEl, phoneErr, 'Enter a valid phone number.'); }
+    else { clearError(phoneEl, phoneErr); }
+
+    if (!passEl.value) { valid = setError(passEl, passErr, 'Password is required.'); }
+    else if (passEl.value.length < 8) { valid = setError(passEl, passErr, 'Password must be at least 8 characters.'); }
+    else if (calcStrength(passEl.value) < 2) { valid = setError(passEl, passErr, 'Password is too weak. Add numbers or symbols.'); }
+    else { clearError(passEl, passErr); }
+
+    if (!confEl.value) { valid = setError(confEl, confErr, 'Please confirm your password.'); }
+    else if (confEl.value !== passEl.value) { valid = setError(confEl, confErr, 'Passwords do not match.'); }
+    else { clearError(confEl, confErr); }
+
+    if (!valid) return;
+
+    const usersDb = JSON.parse(localStorage.getItem('biochew_users_db') || '[]');
+    const emailVal = emailEl.value.trim().toLowerCase();
+    const phoneVal = phoneEl.value.trim();
+
+    // Check duplicate
+    const existsEmail = usersDb.some(u => u.email && u.email.toLowerCase() === emailVal);
+    const existsPhone = usersDb.some(u => u.phone && u.phone.trim() === phoneVal);
+
+    if (existsEmail) {
+        setError(emailEl, emailErr, 'An account with this email already exists.');
+        return;
+    }
+    if (existsPhone) {
+        setError(phoneEl, phoneErr, 'An account with this phone number already exists.');
+        return;
+    }
+
+    const btn = this.querySelector('[type="submit"]');
+    setLoading(btn, true);
+    await fakeRequest(1400);
+    setLoading(btn, false);
+
+    const newUser = {
+        name: nameEl.value.trim(),
+        email: emailVal,
+        phone: phoneVal,
+        password: passEl.value,
+        photo: null,
+        provider: 'email',   // ← key flag used by profile-setup.html guard
+        isNewUser: true,
+        health: {},
+        history: [],
+        notes: []
+    };
+
+    usersDb.push(newUser);
+    localStorage.setItem('biochew_users_db', JSON.stringify(usersDb));
+
+    // Set currently active user session
+    localStorage.setItem('biochew_user', JSON.stringify(newUser));
+    localStorage.setItem('biochew_session_history', JSON.stringify([]));
+    localStorage.setItem('biochew_session_notes', JSON.stringify([]));
+
+    toast('Account created! Let\'s set up your health profile 🎉', 'success');
+    setTimeout(() => {
+        window.location.href = 'profile-setup.html';  // dedicated profile setup page
+    }, 1600);
+});
+
+/* ─────────────────────────────────────────────────────────────
+   FORGOT PASSWORD FORM
+   ───────────────────────────────────────────────────────────── */
+const methodTabs = document.querySelectorAll('.method-tab');
+const forgotEmailGroup = document.getElementById('forgot-email-group');
+const forgotPhoneGroup = document.getElementById('forgot-phone-group');
+let forgotMethod = 'email';
+
+methodTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+        methodTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        forgotMethod = tab.dataset.method;
+        if (forgotMethod === 'email') {
+            forgotEmailGroup.classList.remove('hidden');
+            forgotPhoneGroup.classList.add('hidden');
+        } else {
+            forgotEmailGroup.classList.add('hidden');
+            forgotPhoneGroup.classList.remove('hidden');
+        }
+    });
+});
+
+document.getElementById('form-forgot').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    let valid = true;
+    let identifierVal = '';
+    let targetEmailEl = null;
+    let targetEmailErr = null;
+    let targetPhoneEl = null;
+    let targetPhoneErr = null;
+
+    if (forgotMethod === 'email') {
+        targetEmailEl  = document.getElementById('forgot-email');
+        targetEmailErr = document.getElementById('forgot-email-err');
+        identifierVal = targetEmailEl.value.trim().toLowerCase();
+        if (!identifierVal) { valid = setError(targetEmailEl, targetEmailErr, 'Email is required.'); }
+        else if (!isValidEmail(identifierVal)) { valid = setError(targetEmailEl, targetEmailErr, 'Enter a valid email address.'); }
+        else { clearError(targetEmailEl, targetEmailErr); }
+    } else {
+        targetPhoneEl  = document.getElementById('forgot-phone');
+        targetPhoneErr = document.getElementById('forgot-phone-err');
+        identifierVal = targetPhoneEl.value.trim();
+        if (!identifierVal) { valid = setError(targetPhoneEl, targetPhoneErr, 'Phone number is required.'); }
+        else if (!isValidPhone(identifierVal)) { valid = setError(targetPhoneEl, targetPhoneErr, 'Enter a valid phone number.'); }
+        else { clearError(targetPhoneEl, targetPhoneErr); }
+    }
+
+    if (!valid) return;
+
+    // Check database for existing account
+    const usersDb = JSON.parse(localStorage.getItem('biochew_users_db') || '[]');
+    const matchingUser = usersDb.find(u => 
+        (forgotMethod === 'email' && u.email && u.email.toLowerCase() === identifierVal) ||
+        (forgotMethod === 'phone' && u.phone && u.phone.trim() === identifierVal)
+    );
+
+    if (!matchingUser) {
+        if (forgotMethod === 'email') {
+            setError(targetEmailEl, targetEmailErr, 'Account with this email does not exist.');
+        } else {
+            setError(targetPhoneEl, targetPhoneErr, 'Account with this phone number does not exist.');
+        }
+        return;
+    }
+
+    const btn = this.querySelector('[type="submit"]');
+    setLoading(btn, true);
+    await fakeRequest(1200);
+    setLoading(btn, false);
+
+    const method = forgotMethod === 'email' ? 'email address' : 'phone number';
+    document.getElementById('success-message').textContent =
+        `A password reset link has been sent to your ${method} (${identifierVal}). Please check and follow the instructions.`;
+    showView('success');
+
+    // Trigger sliding mock SMS / Email notification popup in 1.5 seconds
+    setTimeout(() => {
+        const notif = document.getElementById('mock-notification');
+        const notifLink = document.getElementById('mock-notification-link');
+        const notifTitle = notif.querySelector('.notification-title');
+        const notifBody = notif.querySelector('.notification-body');
+        const notifIcon = notif.querySelector('.notification-icon i');
+
+        // Customise notification depending on method
+        if (forgotMethod === 'email') {
+            notifTitle.textContent = "New Email: BioChew Reset";
+            notifBody.innerHTML = `Reset code generated for ${identifierVal}! <a href="#" id="mock-notification-link">Click here to set new password</a>`;
+            if (window.lucide) {
+                notifIcon.setAttribute('data-lucide', 'mail');
+                lucide.createIcons({ nodes: [notifIcon.parentNode] });
+            }
+        } else {
+            notifTitle.textContent = "SMS: BioChew Reset Link";
+            notifBody.innerHTML = `Reset code generated for ${identifierVal}! <a href="#" id="mock-notification-link">Click here to set new password</a>`;
+            if (window.lucide) {
+                notifIcon.setAttribute('data-lucide', 'smartphone');
+                lucide.createIcons({ nodes: [notifIcon.parentNode] });
+            }
+        }
+
+        // Re-bind the click event on the dynamically modified notification link
+        document.getElementById('mock-notification-link').addEventListener('click', (ev) => {
+            ev.preventDefault();
+            notif.classList.remove('show');
+            document.getElementById('reset-user-identifier').value = identifierVal;
+            showView('reset');
+        });
+
+        notif.classList.add('show');
+    }, 1500);
+});
+
+// Close handler for mock notification banner
+document.getElementById('mock-notification-close').addEventListener('click', () => {
+    document.getElementById('mock-notification').classList.remove('show');
+});
+
+/* ─────────────────────────────────────────────────────────────
+   RESET PASSWORD SUBMIT AND NAVIGATION
+   ───────────────────────────────────────────────────────────── */
+document.getElementById('form-reset-password').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    let valid = true;
+
+    const passEl = document.getElementById('reset-password');
+    const confEl = document.getElementById('reset-confirm');
+    const passErr = document.getElementById('reset-pass-err');
+    const confErr = document.getElementById('reset-confirm-err');
+    const userIdentifier = document.getElementById('reset-user-identifier').value;
+
+    if (!passEl.value) { valid = setError(passEl, passErr, 'Password is required.'); }
+    else if (passEl.value.length < 8) { valid = setError(passEl, passErr, 'Password must be at least 8 characters.'); }
+    else if (calcStrength(passEl.value) < 2) { valid = setError(passEl, passErr, 'Password is too weak. Add numbers or symbols.'); }
+    else { clearError(passEl, passErr); }
+
+    if (!confEl.value) { valid = setError(confEl, confErr, 'Please confirm your password.'); }
+    else if (confEl.value !== passEl.value) { valid = setError(confEl, confErr, 'Passwords do not match.'); }
+    else { clearError(confEl, confErr); }
+
+    if (!valid) return;
+
+    const btn = this.querySelector('[type="submit"]');
+    setLoading(btn, true);
+    await fakeRequest(1200);
+    setLoading(btn, false);
+
+    const usersDb = JSON.parse(localStorage.getItem('biochew_users_db') || '[]');
+    const userIndex = usersDb.findIndex(u => 
+        (u.email && u.email.toLowerCase() === userIdentifier.toLowerCase()) || 
+        (u.phone && u.phone.trim() === userIdentifier.trim())
+    );
+
+    if (userIndex !== -1) {
+        usersDb[userIndex].password = passEl.value;
+        localStorage.setItem('biochew_users_db', JSON.stringify(usersDb));
+
+        // If the reset user matches the currently active user session, update it too
+        const activeUser = JSON.parse(localStorage.getItem('biochew_user') || 'null');
+        if (activeUser && (
+            (activeUser.email && activeUser.email.toLowerCase() === userIdentifier.toLowerCase()) ||
+            (activeUser.phone && activeUser.phone.trim() === userIdentifier.trim())
+        )) {
+            activeUser.password = passEl.value;
+            localStorage.setItem('biochew_user', JSON.stringify(activeUser));
+        }
+
+        toast('Password updated successfully! Please sign in with your new password.', 'success');
+        
+        // Reset inputs
+        passEl.value = '';
+        confEl.value = '';
+        passEl.classList.remove('is-valid', 'is-error');
+        confEl.classList.remove('is-valid', 'is-error');
+        
+        showView('login');
+    } else {
+        toast('Failed to reset password. User not found.', 'error');
+    }
+});
+
+// Bind cancel button in reset password view
+document.getElementById('go-login-from-reset-view').addEventListener('click', () => {
+    showView('login');
+});
+
+/* ─────────────────────────────────────────────────────────────
+   GOOGLE OAUTH SIMULATED CHOOSER MODAL
+   ───────────────────────────────────────────────────────────── */
+const googleModal = document.getElementById('google-modal-overlay');
+const googleAccountsList = document.getElementById('google-accounts-list');
+const googleAnotherBtn = document.getElementById('google-another-btn');
+const googleCustomGroup = document.getElementById('google-custom-group');
+const googleCustomEmail = document.getElementById('google-custom-email');
+const googleCustomName = document.getElementById('google-custom-name');
+const googleCustomSubmit = document.getElementById('google-custom-submit');
+const googleChooserClose = document.getElementById('google-chooser-close');
+
+function openGoogleModal() {
+    googleModal.classList.add('open');
+    googleCustomGroup.classList.add('hidden');
+    googleCustomEmail.value = '';
+    googleCustomName.value = '';
+}
+
+function closeGoogleModal() {
+    googleModal.classList.remove('open');
+}
+
+// Show modal on Google buttons
+document.getElementById('btn-google-login').addEventListener('click', openGoogleModal);
+document.getElementById('btn-google-register').addEventListener('click', openGoogleModal);
+
+// Close modal when cancel button is clicked
+googleChooserClose.addEventListener('click', closeGoogleModal);
+
+// Close modal if clicking background overlay
+googleModal.addEventListener('click', function(e) {
+    if (e.target === googleModal) {
+        closeGoogleModal();
+    }
+});
+
+// Toggle custom account inputs
+googleAnotherBtn.addEventListener('click', function() {
+    googleCustomGroup.classList.toggle('hidden');
+});
+
+// Helper to log in a verified Google user account
+function loginGoogleUser(email, name) {
+    const usersDb = JSON.parse(localStorage.getItem('biochew_users_db') || '[]');
+    let existing = usersDb.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+
+    if (!existing) {
+        // Create new account entry
+        existing = {
+            name: name,
+            email: email.toLowerCase(),
+            phone: 'Google Account',
+            password: 'google_provider_stub',
+            photo: null,
+            provider: 'google',
+            health: {},
+            history: [],
+            notes: []
+        };
+        usersDb.push(existing);
+        localStorage.setItem('biochew_users_db', JSON.stringify(usersDb));
+    }
+
+    // Sign in active session
+    localStorage.setItem('biochew_user', JSON.stringify(existing));
+    localStorage.setItem('biochew_session_history', JSON.stringify(existing.history || []));
+    localStorage.setItem('biochew_session_notes', JSON.stringify(existing.notes || []));
+
+    closeGoogleModal();
+    toast(`Welcome, ${existing.name}! Signed in with Google.`, 'success');
+    setTimeout(() => {
+        window.location.href = 'index.html';
+    }, 1500);
+}
+
+// Bind clicks to pre-seeded Google accounts
+document.querySelectorAll('.google-account-item').forEach(item => {
+    item.addEventListener('click', function() {
+        const email = this.dataset.email;
+        const name = this.dataset.name;
+        loginGoogleUser(email, name);
+    });
+});
+
+// Custom Google Account submission
+googleCustomSubmit.addEventListener('click', function() {
+    const emailVal = googleCustomEmail.value.trim();
+    const nameVal = googleCustomName.value.trim() || 'Google User';
+
+    if (!emailVal) {
+        toast('Gmail address is required.', 'error');
+        googleCustomEmail.focus();
+        return;
+    }
+    if (!isValidEmail(emailVal)) {
+        toast('Please enter a valid email address.', 'error');
+        googleCustomEmail.focus();
+        return;
+    }
+
+    loginGoogleUser(emailVal, nameVal);
+});
+
+/* ─────────────────────────────────────────────────────────────
+   NAVIGATION BINDINGS
+───────────────────────────────────────────────────────────── */
+document.getElementById('go-forgot').addEventListener('click', () => showView('forgot'));
+document.getElementById('go-register-from-login').addEventListener('click', () => showView('register'));
+document.getElementById('go-login-from-register').addEventListener('click', () => showView('login'));
+document.getElementById('go-login-from-forgot').addEventListener('click', () => showView('login'));
+document.getElementById('go-login-from-success').addEventListener('click', () => showView('login'));
+
+/* ─────────────────────────────────────────────────────────────
+   LIVE INPUT VALIDATION
+───────────────────────────────────────────────────────────── */
+document.querySelectorAll('.input-wrapper input').forEach(input => {
+    input.addEventListener('input', function () {
+        if (this.classList.contains('is-error')) {
+            this.classList.remove('is-error');
+            const formGroup = this.closest('.form-group');
+            if (formGroup) {
+                const errEl = formGroup.querySelector('.field-error');
+                if (errEl) errEl.textContent = '';
+            }
+        }
+    });
+});
+
+/* ─────────────────────────────────────────────────────────────
+   FAKE ASYNC HELPER
+───────────────────────────────────────────────────────────── */
+function fakeRequest(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PARTICLES CANVAS
+───────────────────────────────────────────────────────────── */
+(function initParticles() {
+    const canvas = document.getElementById('particles-canvas');
+    const ctx    = canvas.getContext('2d');
+    let W, H;
+    const PARTICLE_COUNT = 55;
+    let particles = [];
+
+    function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+
+    class Particle {
+        constructor() { this.reset(true); }
+        reset(init) {
+            this.x  = Math.random() * W;
+            this.y  = init ? Math.random() * H : H + 10;
+            this.r  = 0.5 + Math.random() * 1.5;
+            this.vx = (Math.random() - 0.5) * 0.3;
+            this.vy = -(0.15 + Math.random() * 0.35);
+            this.color = Math.random() > 0.5
+                ? `rgba(0,240,255,${0.2 + Math.random() * 0.4})`
+                : `rgba(57,255,20,${0.15 + Math.random() * 0.3})`;
+        }
+        update() { this.x += this.vx; this.y += this.vy; if (this.y < -10) this.reset(false); }
+        draw()   { ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2); ctx.fillStyle = this.color; ctx.fill(); }
+    }
+
+    function buildParticles() { particles = Array.from({ length: PARTICLE_COUNT }, () => new Particle()); }
+    function loop() { ctx.clearRect(0, 0, W, H); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(loop); }
+
+    window.addEventListener('resize', () => { resize(); buildParticles(); });
+    resize();
+    buildParticles();
+    loop();
+})();

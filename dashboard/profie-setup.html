@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioChew • Health Profile Setup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="auth.css">
+    <style>
+        /* ── Access-gate overlay (shown briefly if wrong provider) ── */
+        #access-gate {
+            display: none;
+            position: fixed; inset: 0;
+            background: var(--bg-dark);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+            padding: 2rem;
+        }
+        #access-gate.show { display: flex; }
+        #access-gate i { width: 48px; height: 48px; color: var(--warning-orange); }
+        #access-gate h2 { font-family: var(--font-heading); font-size: 1.4rem; color: var(--text-primary); }
+        #access-gate p  { font-size: 0.85rem; color: var(--text-secondary); }
+
+        /* ── Page layout ── */
+        body { align-items: flex-start; padding: 2rem 1rem; }
+
+        .setup-wrapper {
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: fadeUp 0.5s ease both;
+        }
+
+        /* Progress */
+        .progress-track {
+            width: 100%; height: 4px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 2px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-cyan), #0088ff);
+            border-radius: 2px;
+            transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+        }
+        .progress-label {
+            display: flex; justify-content: space-between;
+            font-size: 0.75rem; color: var(--text-muted);
+            margin-bottom: 0.4rem;
+        }
+
+        /* Card */
+        .setup-card {
+            width: 100%;
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-card);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: var(--card-shadow), 0 0 60px rgba(0,240,255,0.03);
+            position: relative; overflow: hidden;
+        }
+        .setup-card::before {
+            content: '';
+            position: absolute; top: 0; left: 10%; right: 10%; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-cyan), transparent);
+            opacity: 0.6;
+        }
+
+        /* Step header */
+        .step-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+        .step-icon {
+            width: 48px; height: 48px; border-radius: 14px;
+            background: linear-gradient(135deg, rgba(0,240,255,0.2), rgba(0,136,255,0.2));
+            border: 1px solid rgba(0,240,255,0.25);
+            display: flex; align-items: center; justify-content: center;
+            color: var(--primary-cyan); flex-shrink: 0;
+        }
+        .step-icon i { width: 22px; height: 22px; }
+        .step-title { font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; color: var(--text-primary); }
+        .step-sub { font-size: 0.82rem; color: var(--text-secondary); margin-top: 0.2rem; }
+
+        /* Welcome banner */
+        .welcome-banner {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.85rem 1.1rem;
+            background: linear-gradient(135deg, rgba(57,255,20,0.07), rgba(0,240,255,0.05));
+            border: 1px solid rgba(57,255,20,0.15);
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        .welcome-banner i { width: 20px; height: 20px; color: var(--primary-green); flex-shrink: 0; }
+        .welcome-banner-text { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45; }
+        .welcome-banner-text strong { color: var(--primary-green); }
+        .welcome-name { font-family: var(--font-heading); font-size: 0.9rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.15rem; }
+
+        /* Info note */
+        .info-note {
+            display: flex; align-items: flex-start; gap: 0.6rem;
+            padding: 0.75rem 1rem;
+            background: rgba(0,240,255,0.05);
+            border: 1px solid rgba(0,240,255,0.12);
+            border-radius: 10px;
+            font-size: 0.78rem; color: var(--text-secondary); line-height: 1.45;
+            margin-bottom: 1.5rem;
+        }
+        .info-note i { width: 15px; height: 15px; color: var(--primary-cyan); flex-shrink: 0; margin-top: 1px; }
+
+        /* Photo upload */
+        .photo-upload-area {
+            display: flex; flex-direction: column; align-items: center; gap: 1rem;
+            margin-bottom: 2rem; padding: 1.5rem;
+            border: 2px dashed rgba(0,240,255,0.2);
+            border-radius: 16px; background: rgba(0,240,255,0.02);
+            transition: all 0.3s ease; cursor: pointer; position: relative;
+        }
+        .photo-upload-area:hover { border-color: rgba(0,240,255,0.4); background: rgba(0,240,255,0.05); }
+        .photo-preview {
+            width: 96px; height: 96px; border-radius: 50%;
+            background: rgba(0,0,0,0.3); border: 3px solid rgba(0,240,255,0.3);
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .photo-preview img { width: 100%; height: 100%; object-fit: cover; display: none; }
+        .photo-preview .upload-placeholder { color: var(--text-muted); }
+        .photo-preview .upload-placeholder i { width: 36px; height: 36px; }
+        .photo-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .photo-upload-label { font-size: 0.85rem; color: var(--text-secondary); text-align: center; }
+        .photo-upload-label strong { color: var(--primary-cyan); }
+
+        /* Form grid */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-grid .full-width { grid-column: 1 / -1; }
+        @media (max-width: 600px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .form-grid .full-width { grid-column: 1; }
+        }
+
+        /* Select */
+        .input-wrapper select {
+            width: 100%;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 0.7rem 2.5rem 0.7rem 2.5rem;
+            font-family: var(--font-body); font-size: 0.9rem; color: var(--text-primary);
+            outline: none; appearance: none; -webkit-appearance: none;
+            cursor: pointer; transition: var(--transition-smooth);
+        }
+        .input-wrapper select:focus {
+            border-color: rgba(0,240,255,0.4);
+            background: rgba(0,240,255,0.04);
+            box-shadow: 0 0 0 3px rgba(0,240,255,0.08);
+        }
+        .input-wrapper select option { background: #0d1628; color: var(--text-primary); }
+
+        /* Tags */
+        .tags-group { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+        .tag-chip {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            padding: 0.4rem 0.85rem; border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+            font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);
+            cursor: pointer; transition: var(--transition-smooth); user-select: none;
+        }
+        .tag-chip:hover { border-color: rgba(0,240,255,0.3); color: var(--text-primary); }
+        .tag-chip.selected { background: rgba(0,240,255,0.12); border-color: rgba(0,240,255,0.4); color: var(--primary-cyan); }
+        .tag-chip i { width: 12px; height: 12px; }
+
+        /* Blood type */
+        .blood-types { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+        .blood-btn {
+            padding: 0.4rem 0.85rem; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+            font-family: var(--font-mono); font-size: 0.82rem; font-weight: 700;
+            color: var(--text-secondary); cursor: pointer; transition: var(--transition-smooth);
+        }
+        .blood-btn:hover { border-color: rgba(255,51,102,0.4); color: var(--danger-red); }
+        .blood-btn.selected { background: rgba(255,51,102,0.12); border-color: rgba(255,51,102,0.4); color: var(--danger-red); }
+
+        /* Section divider */
+        .section-divider {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin: 1.5rem 0 1rem; color: var(--text-muted);
+            font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+        }
+        .section-divider::before, .section-divider::after {
+            content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.06);
+        }
+
+        /* Textarea */
+        .input-wrapper textarea {
+            width: 100%; background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+            padding: 0.7rem 1rem 0.7rem 2.5rem;
+            font-family: var(--font-body); font-size: 0.88rem; color: var(--text-primary);
+            outline: none; resize: vertical; min-height: 70px;
+            transition: var(--transition-smooth);
+        }
+        .input-wrapper textarea:focus {
+            border-color: rgba(0,240,255,0.4); background: rgba(0,240,255,0.04);
+            box-shadow: 0 0 0 3px rgba(0,240,255,0.08);
+        }
+        .input-wrapper textarea::placeholder { color: var(--text-muted); font-size: 0.85rem; }
+
+        /* Action row */
+        .action-row { display: flex; gap: 0.75rem; margin-top: 1.75rem; }
+        .action-row .btn { flex: 1; }
+
+        /* Skip */
+        .skip-row { text-align: center; margin-top: 0.75rem; }
+
+        /* Unit hint */
+        .unit-hint { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+    </style>
+</head>
+<body>
+    <!-- Access gate: shown if Google user somehow lands here -->
+    <div id="access-gate">
+        <i data-lucide="shield-off"></i>
+        <h2>Page Not Available</h2>
+        <p>This health profile setup page is only for email/password registrations.<br>
+        Google account users go directly to the dashboard.</p>
+        <a href="index.html" class="btn btn-primary" style="margin-top:0.5rem;">
+            <i data-lucide="layout-dashboard"></i> Go to Dashboard
+        </a>
+    </div>
+
+    <div class="glow-bg"></div>
+    <canvas id="particles-canvas"></canvas>
+
+    <div class="setup-wrapper" id="main-content">
+        <!-- Brand -->
+        <div class="auth-brand">
+            <div class="logo-icon">
+                <i data-lucide="activity" class="pulse-icon"></i>
+            </div>
+            <div class="logo-text">
+                <h1>BioChew</h1>
+                <p>Health Profile Setup</p>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div>
+            <div class="progress-label">
+                <span>Profile Completion</span>
+                <span id="progress-pct">0%</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill" id="progress-bar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Main Card -->
+        <div class="setup-card">
+            <div class="step-header">
+                <div class="step-icon"><i data-lucide="heart-pulse"></i></div>
+                <div>
+                    <div class="step-title">Your Health Profile</div>
+                    <div class="step-sub">Personalise BioChew chewing analytics to your biology</div>
+                </div>
+            </div>
+
+            <!-- Welcome banner (name filled by JS) -->
+            <div class="welcome-banner" id="welcome-banner">
+                <i data-lucide="party-popper"></i>
+                <div class="welcome-banner-text">
+                    <div class="welcome-name" id="welcome-name">Welcome!</div>
+                    <span>Account created successfully. Fill in your health details below — or skip and do it later from the dashboard.</span>
+                </div>
+            </div>
+
+            <div class="info-note">
+                <i data-lucide="shield-check"></i>
+                <span>Your health data is stored locally on your device and never shared. You can update or delete it any time from your profile.</span>
+            </div>
+
+            <!-- Photo Upload -->
+            <div class="photo-upload-area" id="photo-area">
+                <div class="photo-preview" id="photo-preview">
+                    <div class="upload-placeholder">
+                        <i data-lucide="user-round"></i>
+                    </div>
+                    <img id="photo-img" src="" alt="Profile photo">
+                </div>
+                <div class="photo-upload-label">
+                    <strong>Click to upload</strong> or drag & drop your photo<br>
+                    <span style="color:var(--text-muted);font-size:0.74rem;">PNG, JPG up to 5MB</span>
+                </div>
+                <input type="file" id="photo-input" accept="image/*">
+            </div>
+
+            <form id="form-profile" novalidate>
+
+                <!-- Basic Info -->
+                <div class="section-divider">Basic Information</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="ob-age">Age</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="cake" class="input-icon"></i>
+                            <input type="number" id="ob-age" placeholder="e.g. 28" min="1" max="120">
+                        </div>
+                        <span class="unit-hint">years</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob-gender">Biological Sex</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="users" class="input-icon"></i>
+                            <select id="ob-gender">
+                                <option value="" disabled selected>Select</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other / Prefer not to say</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob-height">Height</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="ruler" class="input-icon"></i>
+                            <input type="number" id="ob-height" placeholder="e.g. 175" min="50" max="300">
+                        </div>
+                        <span class="unit-hint">cm</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob-weight">Weight</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="scale" class="input-icon"></i>
+                            <input type="number" id="ob-weight" placeholder="e.g. 70" min="1" max="500">
+                        </div>
+                        <span class="unit-hint">kg</span>
+                    </div>
+                </div>
+
+                <!-- Vitals -->
+                <div class="section-divider">Vitals & Health Markers</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="ob-bp-sys">Blood Pressure (Systolic)</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="activity" class="input-icon"></i>
+                            <input type="number" id="ob-bp-sys" placeholder="e.g. 120" min="60" max="250">
+                        </div>
+                        <span class="unit-hint">mmHg (upper number)</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob-bp-dia">Blood Pressure (Diastolic)</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="activity" class="input-icon"></i>
+                            <input type="number" id="ob-bp-dia" placeholder="e.g. 80" min="40" max="150">
+                        </div>
+                        <span class="unit-hint">mmHg (lower number)</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob-sugar-fast">Fasting Blood Sugar</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="droplets" class="input-icon"></i>
+                            <input type="number" id="ob-sugar-fast" placeholder="e.g. 95" min="40" max="600">
+                        </div>
+                        <span class="unit-hint">mg/dL</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ob-sugar-pp">Post-Meal Blood Sugar</label>
+                        <div class="input-wrapper">
+                            <i data-lucide="droplets" class="input-icon"></i>
+                            <input type="number" id="ob-sugar-pp" placeholder="e.g. 140" min="40" max="600">
+                        </div>
+                        <span class="unit-hint">mg/dL (2hr after meal)</span>
+                    </div>
+                </div>
+
+                <!-- Blood Type -->
+                <div class="form-group" style="margin-top:1rem;">
+                    <label>Blood Group</label>
+                    <div class="blood-types" id="blood-types">
+                        <button type="button" class="blood-btn" data-val="A+">A+</button>
+                        <button type="button" class="blood-btn" data-val="A-">A−</button>
+                        <button type="button" class="blood-btn" data-val="B+">B+</button>
+                        <button type="button" class="blood-btn" data-val="B-">B−</button>
+                        <button type="button" class="blood-btn" data-val="AB+">AB+</button>
+                        <button type="button" class="blood-btn" data-val="AB-">AB−</button>
+                        <button type="button" class="blood-btn" data-val="O+">O+</button>
+                        <button type="button" class="blood-btn" data-val="O-">O−</button>
+                        <button type="button" class="blood-btn" data-val="unknown">Unknown</button>
+                    </div>
+                </div>
+
+                <!-- Medical History -->
+                <div class="section-divider">Past Medical Conditions</div>
+                <div class="form-group">
+                    <label>Select any that apply</label>
+                    <div class="tags-group" id="medical-tags">
+                        <div class="tag-chip" data-val="diabetes-t1"><i data-lucide="droplet"></i> Diabetes (Type 1)</div>
+                        <div class="tag-chip" data-val="diabetes-t2"><i data-lucide="droplet"></i> Diabetes (Type 2)</div>
+                        <div class="tag-chip" data-val="hypertension"><i data-lucide="heart"></i> Hypertension</div>
+                        <div class="tag-chip" data-val="hypotension"><i data-lucide="heart"></i> Hypotension</div>
+                        <div class="tag-chip" data-val="heart-disease"><i data-lucide="heart-crack"></i> Heart Disease</div>
+                        <div class="tag-chip" data-val="thyroid"><i data-lucide="zap"></i> Thyroid Disorder</div>
+                        <div class="tag-chip" data-val="gerd"><i data-lucide="flame"></i> GERD / Acid Reflux</div>
+                        <div class="tag-chip" data-val="ibs"><i data-lucide="wind"></i> IBS / Gut Issues</div>
+                        <div class="tag-chip" data-val="tmj"><i data-lucide="bone"></i> TMJ Disorder</div>
+                        <div class="tag-chip" data-val="bruxism"><i data-lucide="bone"></i> Bruxism (Teeth Grinding)</div>
+                        <div class="tag-chip" data-val="sleep-apnea"><i data-lucide="moon"></i> Sleep Apnea</div>
+                        <div class="tag-chip" data-val="anxiety"><i data-lucide="brain"></i> Anxiety / Stress Disorder</div>
+                        <div class="tag-chip" data-val="stroke"><i data-lucide="zap-off"></i> Stroke History</div>
+                        <div class="tag-chip" data-val="obesity"><i data-lucide="scale"></i> Obesity</div>
+                        <div class="tag-chip" data-val="none"><i data-lucide="check-circle"></i> None of the above</div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="section-divider">Additional Notes</div>
+                <div class="form-group">
+                    <label for="ob-notes">Medications, Allergies, or Other Information</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="file-text" class="input-icon" style="top:0.85rem;"></i>
+                        <textarea id="ob-notes" placeholder="e.g. Taking metformin 500mg, allergic to penicillin…"></textarea>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="action-row">
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="check-circle"></i>
+                        <span>Save Profile & Go to Dashboard</span>
+                    </button>
+                </div>
+
+                <div class="skip-row">
+                    <button type="button" class="link-btn" id="btn-skip">
+                        Skip for now — I'll fill this in later from the dashboard
+                    </button>
+                </div>
+            </form>
+        </div><!-- /setup-card -->
+
+        <p class="auth-footer">
+            &copy; 2026 BioChew &bull; Your data never leaves your device
+        </p>
+    </div>
+
+    <script>
+    'use strict';
+
+    /* ── ACCESS GUARD ───────────────────────────────────────────
+       This page is EXCLUSIVELY for email/password registrants.
+       Google users (provider === 'google') are redirected back
+       to the dashboard immediately. Direct URL-entry is also blocked
+       if no valid email session exists at all.
+    ─────────────────────────────────────────────────────────── */
+    (function guardPage() {
+        const user = JSON.parse(localStorage.getItem('biochew_user') || '{}');
+
+        // Block Google users and unauthenticated visitors
+        if (!user.email || user.provider === 'google') {
+            document.getElementById('access-gate').classList.add('show');
+            document.getElementById('main-content').style.display = 'none';
+            if (window.lucide) lucide.createIcons();
+            return;
+        }
+
+        // Populate welcome banner
+        if (user.name) {
+            document.getElementById('welcome-name').textContent = 'Welcome, ' + user.name.split(' ')[0] + '!';
+        }
+    })();
+
+    /* ── PHOTO UPLOAD ─────────────────────────────────────────── */
+    const photoInput = document.getElementById('photo-input');
+    const photoImg   = document.getElementById('photo-img');
+
+    if (photoInput) {
+        photoInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) { alert('Photo must be under 5MB.'); return; }
+            const reader = new FileReader();
+            reader.onload = e => {
+                photoImg.src = e.target.result;
+                photoImg.style.display = 'block';
+                document.querySelector('#photo-preview .upload-placeholder').style.display = 'none';
+                updateProgress();
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    /* ── BLOOD TYPE ──────────────────────────────────────────── */
+    let selectedBlood = '';
+    document.querySelectorAll('.blood-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.blood-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            selectedBlood = btn.dataset.val;
+            updateProgress();
+        });
+    });
+
+    /* ── MEDICAL TAGS ────────────────────────────────────────── */
+    const selectedConditions = new Set();
+    document.querySelectorAll('#medical-tags .tag-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const val = chip.dataset.val;
+            if (val === 'none') {
+                selectedConditions.clear();
+                document.querySelectorAll('#medical-tags .tag-chip').forEach(c => c.classList.remove('selected'));
+                selectedConditions.add('none');
+                chip.classList.add('selected');
+            } else {
+                selectedConditions.delete('none');
+                document.querySelector('[data-val="none"]').classList.remove('selected');
+                if (selectedConditions.has(val)) {
+                    selectedConditions.delete(val);
+                    chip.classList.remove('selected');
+                } else {
+                    selectedConditions.add(val);
+                    chip.classList.add('selected');
+                }
+            }
+            lucide.createIcons();
+            updateProgress();
+        });
+    });
+
+    /* ── PROGRESS ────────────────────────────────────────────── */
+    function updateProgress() {
+        const fields = ['ob-age','ob-gender','ob-height','ob-weight','ob-bp-sys','ob-bp-dia','ob-sugar-fast'];
+        let filled = 0;
+        fields.forEach(id => { if (document.getElementById(id).value) filled++; });
+        if (selectedBlood) filled++;
+        if (selectedConditions.size > 0) filled++;
+        if (photoImg && photoImg.style.display === 'block') filled++;
+
+        const total = fields.length + 3;
+        const pct   = Math.round((filled / total) * 100);
+        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('progress-pct').textContent = pct + '%';
+    }
+
+    document.querySelectorAll('#form-profile input, #form-profile select, #form-profile textarea').forEach(el => {
+        el.addEventListener('input', updateProgress);
+        el.addEventListener('change', updateProgress);
+    });
+
+    /* ── FORM SUBMIT ─────────────────────────────────────────── */
+    document.getElementById('form-profile').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveProfile();
+    });
+
+    document.getElementById('btn-skip').addEventListener('click', () => {
+        window.location.href = 'index.html';
+    });
+
+    function saveProfile() {
+        const healthData = {
+            age:        document.getElementById('ob-age').value,
+            gender:     document.getElementById('ob-gender').value,
+            height:     document.getElementById('ob-height').value,
+            weight:     document.getElementById('ob-weight').value,
+            bpSys:      document.getElementById('ob-bp-sys').value,
+            bpDia:      document.getElementById('ob-bp-dia').value,
+            sugarFast:  document.getElementById('ob-sugar-fast').value,
+            sugarPP:    document.getElementById('ob-sugar-pp').value,
+            bloodGroup: selectedBlood,
+            conditions: Array.from(selectedConditions),
+            notes:      document.getElementById('ob-notes').value,
+            photo:      photoImg && photoImg.style.display === 'block' ? photoImg.src : null,
+            completedAt: new Date().toISOString()
+        };
+
+        // Calculate BMI
+        if (healthData.height && healthData.weight) {
+            const h = parseFloat(healthData.height) / 100;
+            healthData.bmi = (parseFloat(healthData.weight) / (h * h)).toFixed(1);
+        }
+
+        // Merge into user object
+        const user = JSON.parse(localStorage.getItem('biochew_user') || '{}');
+        user.health = healthData;
+        if (healthData.photo) user.photo = healthData.photo;
+        localStorage.setItem('biochew_user', JSON.stringify(user));
+
+        // Synchronize back to the permanent user database
+        const usersDb = JSON.parse(localStorage.getItem('biochew_users_db') || '[]');
+        const matchingIdx = usersDb.findIndex(u => u.email === user.email || u.phone === user.phone);
+        if (matchingIdx !== -1) {
+            usersDb[matchingIdx].health = healthData;
+            if (healthData.photo) usersDb[matchingIdx].photo = healthData.photo;
+            localStorage.setItem('biochew_users_db', JSON.stringify(usersDb));
+        }
+
+        window.location.href = 'index.html';
+    }
+
+    /* ── INIT ────────────────────────────────────────────────── */
+    lucide.createIcons();
+    </script>
+
+    <!-- Particle canvas (reuse auth.js particle system) -->
+    <script src="auth.js"></script>
+</body>
+</html>

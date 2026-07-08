@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioChew • Biological Chewing Analytics System</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom CSS Link -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="profile.css">
+</head>
+<body class="dark-theme">
+    <div class="glow-bg"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i data-lucide="activity" class="pulse-icon"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>BioChew</h1>
+                    <p>Biological Chewing Analytics System</p>
+                </div>
+            </div>
+            
+            <div class="connection-panel">
+                <div class="connection-status" id="connection-status">
+                    <span class="status-dot disconnected"></span>
+                    <span class="status-label">Disconnected</span>
+                </div>
+                
+                <div class="connection-actions">
+                    <button class="btn btn-primary" id="btn-connect-usb">
+                        <i data-lucide="usb"></i> Connect USB (Serial)
+                    </button>
+                    <button class="btn btn-secondary" id="btn-connect-ble">
+                        <i data-lucide="bluetooth"></i> Connect Bluetooth
+                    </button>
+                    <input type="text" id="picoWifiIp" placeholder="Enter Pico IP (e.g., 192.168.1.15)">
+                    <button class="btn btn-secondary" id="connectWifiBtn" onclick="toggleWifiStream()">
+                        <i data-lucide="wifi"></i> Connect Wi-Fi
+                    </button>
+                    <button class="btn btn-outline btn-icon" id="btn-disconnect" disabled title="Disconnect">
+                        <i data-lucide="power"></i>
+                    </button>
+                </div>
+
+                <!-- ── PROFILE AVATAR ── -->
+                <div class="profile-trigger" id="profile-trigger" title="Your Profile">
+                    <div class="avatar-ring">
+                        <div class="avatar-circle" id="avatar-circle">
+                            <img id="avatar-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;">
+                            <span id="avatar-initials">?</span>
+                        </div>
+                    </div>
+                    <div class="profile-name-wrap">
+                        <span id="header-username" class="header-username">User</span>
+                        <i data-lucide="chevron-down" class="chevron-down" id="profile-chevron"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── PROFILE DROPDOWN ── -->
+            <div class="profile-dropdown" id="profile-dropdown">
+                <!-- Profile header -->
+                <div class="dropdown-user-card">
+                    <div class="dropdown-avatar" id="dropdown-avatar-wrap">
+                        <img id="dropdown-avatar-img" src="" alt="" style="display:none; width:100%; height:100%; object-fit:cover; border-radius:50%;">
+                        <span id="dropdown-initials">?</span>
+                    </div>
+                    <div class="dropdown-user-info">
+                        <span class="dropdown-name" id="dropdown-name">Loading…</span>
+                        <span class="dropdown-email" id="dropdown-email">–</span>
+                    </div>
+                </div>
+
+                <!-- Health summary strip -->
+                <div class="health-strip" id="health-strip" style="display:none;">
+                    <div class="health-chip" id="hchip-bmi">
+                        <i data-lucide="scale"></i> BMI <strong id="hval-bmi">–</strong>
+                    </div>
+                    <div class="health-chip" id="hchip-bp">
+                        <i data-lucide="activity"></i> BP <strong id="hval-bp">–</strong>
+                    </div>
+                    <div class="health-chip" id="hchip-bg">
+                        <i data-lucide="droplets"></i> Blood Group <strong id="hval-bg">–</strong>
+                    </div>
+                </div>
+
+                <div class="dropdown-divider"></div>
+
+                <!-- Menu items -->
+                <nav class="dropdown-nav">
+                    <a href="#" class="dropdown-item" id="menu-view-profile">
+                        <i data-lucide="user-round"></i>
+                        <span>View Full Profile</span>
+                    </a>
+                    <a href="profile-setup.html" class="dropdown-item">
+                        <i data-lucide="pencil"></i>
+                        <span>Edit Health Profile</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="menu-settings">
+                        <i data-lucide="settings"></i>
+                        <span>Settings</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="menu-change-account">
+                        <i data-lucide="user-cog"></i>
+                        <span>Switch / Change Account</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="menu-help">
+                        <i data-lucide="circle-help"></i>
+                        <span>Help & Documentation</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="menu-privacy">
+                        <i data-lucide="shield"></i>
+                        <span>Privacy Policy</span>
+                    </a>
+                </nav>
+
+                <div class="dropdown-divider"></div>
+
+                <a href="auth.html" class="dropdown-item logout-item" id="menu-logout">
+                    <i data-lucide="log-out"></i>
+                    <span>Sign Out</span>
+                </a>
+            </div>
+
+            <!-- ── PROFILE MODAL (full profile view) ── -->
+            <div class="modal-overlay" id="profile-modal-overlay">
+                <div class="profile-modal" id="profile-modal">
+                    <div class="modal-header">
+                        <h2>Your Health Profile</h2>
+                        <button class="modal-close" id="modal-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body" id="modal-body">
+                        <!-- Dynamically filled -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── SETTINGS MODAL ── -->
+            <div class="modal-overlay" id="settings-modal-overlay">
+                <div class="profile-modal" id="settings-modal">
+                    <div class="modal-header">
+                        <h2>Settings</h2>
+                        <button class="modal-close" id="settings-modal-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="settings-section">
+                            <div class="settings-group-label">Dashboard Preferences</div>
+                            <div class="setting-row">
+                                <div>
+                                    <div class="setting-name">Dark Theme</div>
+                                    <div class="setting-desc">Always use the dark BioChew theme</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" checked disabled><span class="slider-switch"></span></label>
+                            </div>
+                            <div class="setting-row">
+                                <div>
+                                    <div class="setting-name">Auto-Export on Reset</div>
+                                    <div class="setting-desc">Automatically download CSV when a session is reset</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="setting-auto-export"><span class="slider-switch"></span></label>
+                            </div>
+                            <div class="setting-row">
+                                <div>
+                                    <div class="setting-name">Sound Alerts</div>
+                                    <div class="setting-desc">Beep on chew detection (requires active session)</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="setting-sound"><span class="slider-switch"></span></label>
+                            </div>
+                            <div class="setting-row">
+                                <div>
+                                    <div class="setting-name">Console Timestamps</div>
+                                    <div class="setting-desc">Show precise timestamps in diagnostics console</div>
+                                </div>
+                                <label class="switch"><input type="checkbox" id="setting-timestamps" checked><span class="slider-switch"></span></label>
+                            </div>
+                        </div>
+                        <div class="settings-section">
+                            <div class="settings-group-label">Data & Privacy</div>
+                            <div class="setting-row">
+                                <div>
+                                    <div class="setting-name">Clear All Session Logs</div>
+                                    <div class="setting-desc">Delete all stored session telemetry from local storage</div>
+                                </div>
+                                <button class="btn btn-danger btn-small" onclick="localStorage.removeItem('biochew_logs'); alert('Session logs cleared.')">Clear</button>
+                            </div>
+                            <div class="setting-row">
+                                <div>
+                                    <div class="setting-name">Delete Health Profile</div>
+                                    <div class="setting-desc">Remove all your health data from this device</div>
+                                </div>
+                                <button class="btn btn-danger btn-small" onclick="confirmDeleteHealth()">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── HELP MODAL ── -->
+            <div class="modal-overlay" id="help-modal-overlay">
+                <div class="profile-modal" id="help-modal">
+                    <div class="modal-header">
+                        <h2><i data-lucide="circle-help" style="width:20px;height:20px;vertical-align:middle;margin-right:6px;"></i>Help & Documentation</h2>
+                        <button class="modal-close" id="help-modal-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="help-section">
+                            <div class="help-topic">
+                                <div class="help-topic-icon"><i data-lucide="usb"></i></div>
+                                <div>
+                                    <div class="help-topic-title">Connecting via USB (Web Serial)</div>
+                                    <div class="help-topic-body">Click <strong>Connect USB (Serial)</strong> in the header. Your browser will show a port picker — select your Pico W's COM port. Requires Chrome or Edge with Web Serial API support.</div>
+                                </div>
+                            </div>
+                            <div class="help-topic">
+                                <div class="help-topic-icon"><i data-lucide="bluetooth"></i></div>
+                                <div>
+                                    <div class="help-topic-title">Connecting via Bluetooth (BLE)</div>
+                                    <div class="help-topic-body">Click <strong>Connect Bluetooth</strong>. Make sure BLE is enabled on your device. The Pico W must be running the BioChew BLE firmware and be in pairing range.</div>
+                                </div>
+                            </div>
+                            <div class="help-topic">
+                                <div class="help-topic-icon"><i data-lucide="sliders"></i></div>
+                                <div>
+                                    <div class="help-topic-title">Calibrating Detection</div>
+                                    <div class="help-topic-body">Adjust the <strong>Chew Signal Threshold</strong> slider based on your jaw movement strength. Lower values detect lighter chews; higher values filter out noise. The <strong>Debounce</strong> setting prevents double-counting a single chew cycle.</div>
+                                </div>
+                            </div>
+                            <div class="help-topic">
+                                <div class="help-topic-icon"><i data-lucide="hand"></i></div>
+                                <div>
+                                    <div class="help-topic-title">Using Simulation Mode</div>
+                                    <div class="help-topic-body">Toggle <strong>Demo Mode</strong> to test the full dashboard without hardware. Use <em>Simulate Single Chew</em> for manual testing or <em>Auto-Chewing (70 CPM)</em> for continuous simulation.</div>
+                                </div>
+                            </div>
+                            <div class="help-topic">
+                                <div class="help-topic-icon"><i data-lucide="download"></i></div>
+                                <div>
+                                    <div class="help-topic-title">Exporting Session Data</div>
+                                    <div class="help-topic-body">After a session, click <strong>Export Session Data (CSV)</strong> to download a timestamped CSV with accelerometer values, gyroscope magnitude, chew count, CPM, and duration for every recorded moment.</div>
+                                </div>
+                            </div>
+                            <div class="help-topic">
+                                <div class="help-topic-icon"><i data-lucide="heart-pulse"></i></div>
+                                <div>
+                                    <div class="help-topic-title">Chewing Rate Guidelines</div>
+                                    <div class="help-topic-body">Research suggests <strong>40–90 CPM</strong> is an ideal chewing pace for thorough digestion. Under 40 CPM may indicate under-chewing; over 90 CPM may suggest aggressive chewing that strains the jaw.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top:1.5rem; text-align:center;">
+                            <a href="https://docs.biochew.local" class="btn btn-outline btn-small" target="_blank">
+                                <i data-lucide="external-link"></i> Full Documentation
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Grid -->
+        <main class="dashboard-grid">
+            <!-- Left Panel: Session Analytics & Indicators -->
+            <section class="grid-card stats-panel">
+                <div class="card-header">
+                    <h2>Session Telemetry</h2>
+                    <div class="badge-container" style="display: flex; gap: 0.35rem;">
+                        <span class="badge" id="session-badge">IDLE</span>
+                        <span class="badge" id="calibration-badge" style="display: none;">CALIBRATING</span>
+                    </div>
+                </div>
+
+                <!-- Big Chew Counter Visualizer -->
+                <div class="chew-visualizer-container">
+                    <div class="chew-pulse-ring" id="pulse-ring"></div>
+                    <div class="chew-counter-circle" id="chew-circle">
+                        <span class="stat-title">TOTAL CHEWS</span>
+                        <h2 class="huge-number" id="val-chews">000</h2>
+                        <span class="stat-unit" id="chew-indicator-text">Waiting to Chew</span>
+                    </div>
+                </div>
+
+                <!-- Live Biofeedback Healthy Eating Alerts -->
+                <div class="biofeedback-banner info" id="biofeedback-banner">
+                    <div class="biofeedback-icon" id="biofeedback-icon">💡</div>
+                    <div class="biofeedback-text" id="biofeedback-text">
+                        Ready to analyze your chewing. Start eating!
+                    </div>
+                </div>
+
+                <!-- Core Stats Cards -->
+                <div class="stats-row">
+                    <div class="sub-stat-card">
+                        <div class="icon-box cyan">
+                            <i data-lucide="gauge"></i>
+                        </div>
+                        <div class="sub-stat-data">
+                            <span class="sub-stat-title">Chewing Rate</span>
+                            <div class="stat-flex">
+                                <span class="sub-stat-value" id="val-cpm">0.0</span>
+                                <span class="sub-stat-unit">CPM</span>
+                            </div>
+                            <span class="rate-status text-muted" id="rate-status">Stationary</span>
+                        </div>
+                    </div>
+
+                    <div class="sub-stat-card">
+                        <div class="icon-box green">
+                            <i data-lucide="timer"></i>
+                        </div>
+                        <div class="sub-stat-data">
+                            <span class="sub-stat-title">Active Session</span>
+                            <div class="stat-flex">
+                                <span class="sub-stat-value font-mono" id="val-time">00:00.0</span>
+                            </div>
+                            <span class="rate-status text-muted">Session Duration</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="session-controls">
+                    <button class="btn btn-success" id="btn-start" disabled>
+                        <i data-lucide="play"></i> Start Session
+                    </button>
+                    <button class="btn btn-warning" id="btn-pause" disabled>
+                        <i data-lucide="pause"></i> Pause
+                    </button>
+                    <button class="btn btn-danger" id="btn-reset" disabled>
+                        <i data-lucide="rotate-ccw"></i> Reset
+                    </button>
+                </div>
+                
+                <div class="export-controls">
+                    <button class="btn btn-outline btn-full" id="btn-export" disabled>
+                        <i data-lucide="download"></i> Export Session Data (CSV)
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Panel: Live Graphs & Calibration -->
+            <div class="right-content">
+                <!-- Solid vs Liquid Diet Characterization Card -->
+                <section class="grid-card diet-characterization-card" id="diet-card" style="background-color: #1a1f2c; padding: 20px; border-radius: 12px; border: 1px solid #2e3748; margin-bottom: 1.5rem; border-left: 8px solid #64748b; transition: all 0.3s ease;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700;">CURRENT DIET CHARACTERIZATION</span>
+                        <div style="display: flex; gap: 0.35rem; align-items: center;">
+                            <span id="imu-status-badge" style="font-size: 0.75rem; font-weight: 700; background-color: rgba(255, 255, 255, 0.04); padding: 0.2rem 0.5rem; border-radius: 6px; border: 1px solid #dc3545; color: #dc3545;">IMU: OFF</span>
+                            <span id="diet-state-badge" style="font-size: 0.75rem; font-weight: 700; background-color: rgba(255, 255, 255, 0.04); padding: 0.2rem 0.5rem; border-radius: 6px; border: 1px solid #64748b; color: #64748b;">IDLE (State 0)</span>
+                        </div>
+                    </div>
+                    
+                    <h2 id="diet-type-title" style="font-size: 1.45rem; font-weight: 800; margin: 0.5rem 0 1.25rem 0; letter-spacing: -0.02em; color: #ffffff; text-shadow: 0 0 10px rgba(100, 116, 139, 0.2); transition: color 0.3s ease;">IDLE / NO INTAKE</h2>
+                    
+                    <!-- Progress Bars Visualizer Row -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1rem;">
+                        <!-- Bite Force -->
+                        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: #94a3b8;">
+                                <span>Bite Force Intensity (FSR)</span>
+                                <span id="diet-force-val" style="font-family: monospace; color: #f8fafc;">0 ADC</span>
+                            </div>
+                            <div style="width: 100%; height: 8px; background-color: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="diet-force-bar" style="height: 100%; width: 0%; background-color: #00f0ff; border-radius: 4px; transition: width 0.1s linear; box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Jaw Angle -->
+                        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: #94a3b8;">
+                                <span>Jaw Opening Angle (Flex)</span>
+                                <span id="diet-angle-val" style="font-family: monospace; color: #f8fafc;">0 ADC</span>
+                            </div>
+                            <div style="width: 100%; height: 8px; background-color: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="diet-angle-bar" style="height: 100%; width: 0%; background-color: #ff9f43; border-radius: 4px; transition: width 0.1s linear; box-shadow: 0 0 8px rgba(255, 159, 67, 0.4);"></div>
+                            </div>
+                        </div>
+
+                        <!-- IMU Gyro -->
+                        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: #94a3b8;">
+                                <span>Head/Jaw Rotation (IMU)</span>
+                                <span id="diet-gyro-val" style="font-family: monospace; color: #f8fafc;">0.00 rad/s</span>
+                            </div>
+                            <div style="width: 100%; height: 8px; background-color: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="diet-gyro-bar" style="height: 100%; width: 0%; background-color: #a55eea; border-radius: 4px; transition: width 0.1s linear; box-shadow: 0 0 8px rgba(165, 94, 234, 0.4);"></div>
+                            </div>
+                        </div>
+
+                        <!-- Acoustic Mic -->
+                        <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 600; color: #94a3b8;">
+                                <span>Acoustic Volume (Piezo)</span>
+                                <span id="diet-sound-val" style="font-family: monospace; color: #f8fafc;">0 ADC</span>
+                            </div>
+                            <div style="width: 100%; height: 8px; background-color: rgba(255, 255, 255, 0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="diet-sound-bar" style="height: 100%; width: 0%; background-color: #1dd1a1; border-radius: 4px; transition: width 0.1s linear; box-shadow: 0 0 8px rgba(29, 209, 161, 0.4);"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Graphical Panel -->
+                <section class="grid-card graph-panel">
+                    <div class="card-header">
+                        <div class="header-titles">
+                            <h2>Real-Time Waveform</h2>
+                            <p class="subtitle">Visualizing multi-modal neckband sensors: Bite Force (FSR), Mandibular Angle (Flex), and Acoustic Volume (Mic)</p>
+                        </div>
+                        <div class="sensor-selectors">
+                            <span class="live-indicator"><span class="pulse-dot"></span> LIVE</span>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="telemetryChart"></canvas>
+                    </div>
+                </section>
+
+                <div class="bottom-grid">
+                    <!-- Calibration Settings -->
+                    <section class="grid-card calibration-panel">
+                        <div class="card-header">
+                            <h2>Calibration & Sensitivity</h2>
+                        </div>
+                        
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <label for="input-thresh">Chew Signal Threshold</label>
+                                <span class="slider-value" id="val-thresh-slider">1.50 rad/s</span>
+                            </div>
+                            <input type="range" id="input-thresh" min="0.2" max="5.0" step="0.05" value="1.5">
+                            <p class="control-help">Minimum rotation rate deviation required to trigger a chew. Lower values increase sensitivity.</p>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="slider-header">
+                                <label for="input-debounce">Debounce Time Lockout</label>
+                                <span class="slider-value" id="val-debounce-slider">500 ms</span>
+                            </div>
+                            <input type="range" id="input-debounce" min="200" max="1500" step="50" value="500">
+                            <p class="control-help">Lockout period after a detected chew to prevent multiple triggers from a single chew cycle.</p>
+                        </div>
+
+                        <div class="calibration-actions">
+                            <button class="btn btn-primary" id="btn-apply-cal" disabled>
+                                <i data-lucide="sliders"></i> Apply Calibration to Pico W
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Interactive Demo Mode (Simulate Chews without hardware) -->
+                    <section class="grid-card demo-panel">
+                        <div class="card-header">
+                            <h2>Simulation / Hardware Sandbox</h2>
+                        </div>
+                        <p class="demo-description">
+                            Don't have your Pico W wired up yet? Enable <strong>Demo Mode</strong> to simulate biological chewing signals and fully test the dashboard's analytics.
+                        </p>
+                        
+                        <div class="demo-switch-row">
+                            <div class="switch-container">
+                                <span class="switch-label">Demo Simulation Mode</span>
+                                <label class="switch">
+                                    <input type="checkbox" id="demo-mode-toggle">
+                                    <span class="slider-switch"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="demo-controls-row" id="demo-buttons" style="opacity: 0.5; pointer-events: none;">
+                            <button class="btn btn-outline" id="btn-sim-chew">
+                                <i data-lucide="hand"></i> Simulate Single Chew
+                            </button>
+                            <button class="btn btn-outline" id="btn-sim-continuous">
+                                <i data-lucide="repeat"></i> Auto-Chewing (70 CPM)
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </main>
+
+        <!-- ── EXTRA WIDGETS ROW ── -->
+        <div class="extra-widgets">
+            <!-- Session History -->
+            <section class="grid-card extra-card">
+                <div class="card-header">
+                    <h2>Session History</h2>
+                    <span class="badge" id="history-count-badge">0 sessions</span>
+                </div>
+                <div class="history-list" id="history-list">
+                    <div class="empty-state">
+                        <i data-lucide="clock"></i>
+                        <p>No sessions recorded yet. Start your first session!</p>
+                    </div>
+                </div>
+                <button class="btn btn-outline btn-full" style="margin-top:0.75rem; font-size:0.78rem;" id="btn-clear-history">
+                    <i data-lucide="trash-2"></i> Clear History
+                </button>
+            </section>
+
+            <!-- Health Score Widget -->
+            <section class="grid-card extra-card">
+                <div class="card-header">
+                    <h2>Chewing Health Score</h2>
+                    <span class="badge" id="health-score-badge">—</span>
+                </div>
+                <div class="health-score-body">
+                    <div class="score-ring-wrap">
+                        <svg viewBox="0 0 100 100" class="score-ring-svg">
+                            <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                            <circle cx="50" cy="50" r="42" fill="none" stroke="var(--primary-cyan)" stroke-width="8"
+                                stroke-dasharray="263.9" stroke-dashoffset="263.9"
+                                stroke-linecap="round" id="score-ring-circle" style="transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1); transform: rotate(-90deg); transform-origin: 50% 50%;"/>
+                        </svg>
+                        <div class="score-center">
+                            <span class="score-number" id="score-number">—</span>
+                            <span class="score-label">/ 100</span>
+                        </div>
+                    </div>
+                    <div class="score-breakdown" id="score-breakdown">
+                        <div class="score-item">
+                            <span class="score-item-label">Avg CPM</span>
+                            <span class="score-item-val" id="si-cpm">–</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-item-label">Sessions Today</span>
+                            <span class="score-item-val" id="si-sessions">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-item-label">Total Chews</span>
+                            <span class="score-item-val" id="si-total-chews">0</span>
+                        </div>
+                        <div class="score-item">
+                            <span class="score-item-label">Best CPM</span>
+                            <span class="score-item-val" id="si-best-cpm">–</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Notes -->
+            <section class="grid-card extra-card">
+                <div class="card-header">
+                    <h2>Session Notes</h2>
+                    <span class="badge">Quick Log</span>
+                </div>
+                <p style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:0.75rem;">Add notes about your meal or chewing conditions for this session.</p>
+                <textarea id="session-note-input" placeholder="e.g. Had rice for lunch, jaw felt tight on left side…" style="width:100%; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:0.7rem 1rem; font-family:var(--font-body); font-size:0.85rem; color:var(--text-primary); outline:none; resize:vertical; min-height:80px; transition:all 0.3s ease;" onfocus="this.style.borderColor='rgba(0,240,255,0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'"></textarea>
+                <button class="btn btn-primary" style="margin-top:0.75rem; width:100%; font-size:0.82rem;" id="btn-save-note">
+                    <i data-lucide="save"></i> Save Note
+                </button>
+                <div id="saved-notes-list" style="margin-top:1rem; display:flex; flex-direction:column; gap:0.4rem; max-height:120px; overflow-y:auto;"></div>
+            </section>
+        </div>
+
+        <!-- System Logs Console -->
+        <footer class="console-section grid-card">
+            <div class="card-header console-header">
+                <div class="console-title-area">
+                    <i data-lucide="terminal"></i>
+                    <h2>System Diagnostics Console</h2>
+                </div>
+                <button class="btn btn-outline btn-small" id="btn-clear-console">Clear Console</button>
+            </div>
+            <div class="console-body font-mono" id="console-logs">
+                <span class="log-line system">[SYSTEM] Welcome to BioChew. Connect your Pico W over USB or BLE, or enable Simulation Mode.</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Custom Script Link -->
+    <script src="app.js"></script>
+    <script src="profile.js"></script>
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
